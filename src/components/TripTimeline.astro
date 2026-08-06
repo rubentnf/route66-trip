@@ -1,0 +1,85 @@
+---
+import { days } from "../data/trip";
+---
+
+<div class="timeline">
+    {
+        days.map((day) => (
+            <article
+                id={`day-${day.id}`}
+                class="day-card"
+                data-location-id={day.locationId}
+            >
+                <div class="day-card__header">
+                    <span
+                        class="day-card__badge"
+                        class:list={{
+                            "day-card__badge--route66": day.id === 11,
+                        }}
+                    >
+                        {day.id === 11 ? "🛣️" : day.id}
+                    </span>
+                    <div>
+                        <p class="day-card__date">
+                            {day.weekday} ·{" "}
+                            {new Date(day.date).toLocaleDateString("es-ES", {
+                                day: "2-digit",
+                                month: "short",
+                            })}
+                        </p>
+                        <h3>{day.title}</h3>
+                    </div>
+                </div>
+                <ul>
+                    {day.activities.map((act) => (
+                        <li>{act}</li>
+                    ))}
+                </ul>
+                {day.overnight && (
+                    <p class="day-card__overnight">🌙 {day.overnight}</p>
+                )}
+            </article>
+        ))
+    }
+</div>
+
+<script>
+    import { days as allDays } from "../data/trip";
+    import { getEffectiveNow } from "../utils/tripDate";
+
+    const cards = document.querySelectorAll<HTMLElement>(".day-card");
+
+    const observer = new IntersectionObserver(
+        (entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    const locationId =
+                        entry.target.getAttribute("data-location-id");
+                    window.dispatchEvent(
+                        new CustomEvent("trip:day-active", {
+                            detail: { locationId },
+                        }),
+                    );
+                }
+            });
+        },
+        {
+            // Consideramos "activa" la tarjeta cuando cruza el tercio superior del viewport
+            rootMargin: "-20% 0px -60% 0px",
+            threshold: 0,
+        },
+    );
+
+    setTimeout(() => {
+        cards.forEach((card) => observer.observe(card));
+    }, 50);
+
+    // Resalta la tarjeta del día actual, respetando el flag ?debugDate si está presente
+    const todayStr = getEffectiveNow().toISOString().split("T")[0];
+    const todayTrip = allDays.find((d) => d.date === todayStr);
+    if (todayTrip) {
+        document
+            .getElementById(`day-${todayTrip.id}`)
+            ?.classList.add("day-card--today");
+    }
+</script>

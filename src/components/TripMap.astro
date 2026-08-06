@@ -1,0 +1,192 @@
+<div id="trip-map" style="height: 100%; width: 100%; border-radius: 12px;">
+</div>
+
+<style is:global>
+    @import "leaflet/dist/leaflet.css";
+
+    .trip-marker {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        color: white;
+        font-weight: 700;
+        font-size: 14px;
+        border: 3px solid white;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .trip-marker--active {
+        transform: scale(1.3);
+        box-shadow:
+            0 0 0 4px rgba(0, 0, 0, 0.15),
+            0 4px 10px rgba(0, 0, 0, 0.4);
+        z-index: 1000 !important;
+    }
+</style>
+
+<script>
+    import L from "leaflet";
+    import { locations, days, type TripDay } from "../data/trip";
+    import { getTodayTrip } from "../utils/tripDate";
+
+    const colorMap: Record<string, string> = {
+        purple: "#7c3aed",
+        green: "#16a34a",
+        orange: "#c2410c", // ahora usa --color-rust
+        blue: "#0d9488", // ahora usa --color-turquoise
+        red: "#dc2626",
+        yellow: "#ca8a04", // ya coincide con --color-mustard
+        brown: "#78350f",
+        teal: "#0d9488",
+    };
+
+    function groupDaysByLocation(allDays: TripDay[]) {
+        const order: string[] = [];
+        const map = new Map<string, TripDay[]>();
+
+        for (const day of allDays) {
+            if (!map.has(day.locationId)) {
+                map.set(day.locationId, []);
+                order.push(day.locationId);
+            }
+            map.get(day.locationId)!.push(day);
+        }
+        return { order, map };
+    }
+
+    async function getRoadRoute(
+        coords: [number, number][],
+    ): Promise<[number, number][]> {
+        const cacheKey = "trip-route-cache-v1";
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            try {
+                return JSON.parse(cached);
+            } catch {
+                // cache corrupta, seguimos y la regeneramos
+            }
+        }
+
+        const coordsStr = coords.map(([lat, lng]) => `${lng},${lat}`).join(";");
+        const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            const route = data.routes[0].geometry.coordinates.map(
+                ([lng, lat]: [number, number]) => [lat, lng],
+            );
+            localStorage.setItem(cacheKey, JSON.stringify(route));
+            return route;
+        } catch (err) {
+            console.warn("OSRM falló, usando línea recta de respaldo", err);
+            return coords;
+        }
+    }
+
+    async function initMap() {
+        const { order, map: daysByLocation } = groupDaysByLocation(days);
+
+        const map = L.map("trip-map", { scrollWheelZoom: false }).setView(
+            [36.5, -116.5],
+            6,
+        );
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "&copy; OpenStreetMap contributors",
+            maxZoom: 12,
+        }).addTo(map);
+
+        const routeCoords: [number, number][] = [];
+        const markersByLocation: Record<string, L.Marker> = {};
+
+        order.forEach((locationId) => {
+            const location = locations.find((l) => l.id === locationId);
+            if (!location) return;
+
+            const groupDays = daysByLocation.get(locationId)!;
+            const color = colorMap[location.colorGroup] ?? "#333";
+            routeCoords.push([location.lat, location.lng]);
+
+            const label =
+                groupDays.length === 1
+                    ? `${groupDays[0].id}`
+                    : `${groupDays[0].id}-${groupDays[groupDays.length - 1].id}`;
+
+            const icon = L.divIcon({
+                className: "",
+                html: `<div class="trip-marker" style="background:${color}">${label}</div>`,
+                iconSize: [34, 34],
+                iconAnchor: [17, 17],
+            });
+
+            const popupHtml = `
+        <strong>${location.name}</strong>
+        <ul style="margin:6px 0 0; padding-left:16px;">
+          ${groupDays.map((d) => `<li><a href="#day-${d.id}">Día ${d.id} · ${d.title}</a></li>`).join("")}
+        </ul>
+      `;
+
+            markersByLocation[locationId] = L.marker(
+                [location.lat, location.lng],
+                { icon },
+            )
+                .addTo(map)
+                .bindPopup(popupHtml);
+        });
+
+        const roadRoute = await getRoadRoute(routeCoords);
+
+        L.polyline(roadRoute, {
+            color: "#334155",
+            weight: 3,
+        }).addTo(map);
+
+        map.fitBounds(roadRoute, { padding: [40, 40] });
+
+        let activeMarker: L.Marker | null = null;
+
+        window.addEventListener("trip:day-active", (e: Event) => {
+            const { locationId } = (e as CustomEvent).detail;
+            const location = locations.find((l) => l.id === locationId);
+            const marker = markersByLocation[locationId];
+            if (!location || !marker) return;
+
+            map.flyTo([location.lat, location.lng], 9, { duration: 0.8 });
+
+            if (activeMarker)
+                activeMarker
+                    .getElement()
+                    ?.classList.remove("trip-marker--active");
+            marker.getElement()?.classList.add("trip-marker--active");
+            activeMarker = marker;
+
+            // Modo Vegas: tema oscuro con acentos neón solo mientras el día activo es Las Vegas
+            document.body.classList.toggle(
+                "theme-vegas",
+                locationId === "vegas",
+            );
+        });
+
+        const todayTrip = getTodayTrip();
+        if (todayTrip) {
+            window.dispatchEvent(
+                new CustomEvent("trip:day-active", {
+                    detail: { locationId: todayTrip.locationId },
+                }),
+            );
+        }
+
+        const mapContainer = document.getElementById("trip-map")!;
+        mapContainer.addEventListener("click", () => {
+            if (window.innerWidth > 768) return;
+            document.body.classList.toggle("map-expanded");
+            setTimeout(() => map.invalidateSize(), 310);
+        });
+    }
+
+    initMap();
+</script>

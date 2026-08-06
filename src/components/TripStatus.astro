@@ -1,0 +1,69 @@
+<div id="trip-status" class="trip-status"></div>
+
+<style>
+    .trip-status {
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        background: #f1f5f9;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+    .trip-status--live {
+        background: #dcfce7;
+        color: #166534;
+    }
+</style>
+
+<script>
+    import { days } from "../data/trip";
+    import { getEffectiveNow } from "../utils/tripDate";
+
+    const el = document.getElementById("trip-status")!;
+
+    const tripStart = new Date(days[0].date + "T00:00:00");
+    const tripEnd = new Date(days[days.length - 1].date + "T23:59:59");
+
+    function render() {
+        const now = getEffectiveNow();
+        const params = new URLSearchParams(window.location.search);
+        const isDebug = params.has("debugDate");
+
+        if (now < tripStart) {
+            // ANTES del viaje: countdown
+            const diffMs = tripStart.getTime() - now.getTime();
+            const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+            el.textContent = `🗓️ Faltan ${daysLeft} días para el viaje`;
+            el.classList.remove("trip-status--live");
+        } else if (now >= tripStart && now <= tripEnd) {
+            // DURANTE el viaje: modo "hoy"
+            const todayStr = now.toISOString().split("T")[0];
+            const todayTrip = days.find((d) => d.date === todayStr);
+
+            if (todayTrip) {
+                el.textContent = `📍 Hoy es el Día ${todayTrip.id}: ${todayTrip.title}`;
+                el.classList.add("trip-status--live");
+
+                const alreadyScrolled =
+                    sessionStorage.getItem("trip-auto-scrolled");
+                if (!alreadyScrolled || isDebug) {
+                    document
+                        .getElementById(`day-${todayTrip.id}`)
+                        ?.scrollIntoView({
+                            behavior: isDebug ? "auto" : "smooth",
+                            block: "start",
+                        });
+                    if (!isDebug)
+                        sessionStorage.setItem("trip-auto-scrolled", "true");
+                }
+            } else {
+                // DESPUÉS del viaje
+                el.textContent = `✅ Viaje completado — ¡qué pasada!`;
+                el.classList.remove("trip-status--live");
+            }
+        }
+    }
+
+    render();
+    // Refresca cada hora por si la página queda abierta cruzando medianoche
+    setInterval(render, 60 * 60 * 1000);
+</script>

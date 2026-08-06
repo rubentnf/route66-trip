@@ -1,0 +1,199 @@
+<div class="checklist">
+    <h2>✅ Checklist del viaje</h2>
+
+    <div class="checklist__user-select">
+        <label for="user-select">Soy:</label>
+        <select id="user-select"></select>
+    </div>
+
+    <form id="checklist-form" class="checklist__form">
+        <input
+            type="text"
+            id="new-task"
+            placeholder="Añadir tarea..."
+            required
+        />
+        <button type="submit">Añadir</button>
+    </form>
+
+    <ul id="checklist-list" class="checklist__list"></ul>
+</div>
+
+<style>
+    .checklist {
+        padding: 1.5rem;
+        background: white;
+        border: 2px solid var(--color-navy);
+        border-radius: 8px;
+        box-shadow: 4px 4px 0 var(--color-navy);
+        margin-bottom: 1.5rem;
+    }
+    .checklist__user-select {
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .checklist__form {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .checklist__form input {
+        flex: 1;
+        padding: 0.5rem;
+        border: 2px solid var(--color-navy);
+        border-radius: 6px;
+    }
+    .checklist__form button {
+        padding: 0.5rem 1rem;
+        background: var(--color-rust);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .checklist__list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    .checklist__list li {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e5e5e5;
+    }
+    .checklist__list li.done span.task-text {
+        text-decoration: line-through;
+        color: #94a3b8;
+    }
+    .checklist__list .task-meta {
+        margin-left: auto;
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+    .checklist__list button.delete-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #dc2626;
+        font-size: 1.1rem;
+    }
+</style>
+
+<script>
+    import { supabase } from "../lib/supabase";
+    import { DIVAS, getCurrentUser, setCurrentUser } from "../utils/identity";
+
+    const userSelect = document.getElementById(
+        "user-select",
+    ) as HTMLSelectElement;
+    const form = document.getElementById("checklist-form") as HTMLFormElement;
+    const input = document.getElementById("new-task") as HTMLInputElement;
+    const list = document.getElementById("checklist-list")!;
+
+    // Rellena el selector de "quién eres" y recupera la selección guardada
+    userSelect.innerHTML = DIVAS.map(
+        (name) => `<option value="${name}">${name}</option>`,
+    ).join("");
+    const savedUser = getCurrentUser();
+    if (savedUser) userSelect.value = savedUser;
+    else setCurrentUser(DIVAS[0]); // por defecto, la primera de la lista
+
+    userSelect.addEventListener("change", () =>
+        setCurrentUser(userSelect.value),
+    );
+
+    // Carga inicial de items
+    async function loadItems() {
+        const { data, error } = await supabase
+            .from("checklist_items")
+            .select("*")
+            .order("created_at", { ascending: true });
+
+        if (error) {
+            console.error("Error cargando checklist:", error);
+            return;
+        }
+        renderItems(data ?? []);
+    }
+
+    function renderItems(items: any[]) {
+        list.innerHTML = items
+            .map(
+                (item) => `
+      <li class="${item.done ? "done" : ""}" data-id="${item.id}">
+        <input type="checkbox" ${item.done ? "checked" : ""} class="toggle-done" />
+        <span class="task-text">${item.task}</span>
+        ${item.done_by ? `<span class="task-meta">✓ ${item.done_by}</span>` : ""}
+        <button class="delete-btn" title="Eliminar">🗑️</button>
+      </li>
+    `,
+            )
+            .join("");
+    }
+
+    // Añadir nueva tarea
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const task = input.value.trim();
+        if (!task) return;
+
+        const { error } = await supabase
+            .from("checklist_items")
+            .insert({ task });
+        if (error) {
+            console.error("Error añadiendo tarea:", error);
+            return;
+        }
+        input.value = "";
+    });
+
+    // Delegación de eventos para toggle/borrar (los <li> se regeneran dinámicamente)
+    list.addEventListener("click", async (e) => {
+        const target = e.target as HTMLElement;
+        const li = target.closest("li");
+        if (!li) return;
+        const id = li.dataset.id;
+
+        if (target.classList.contains("toggle-done")) {
+            const checked = (target as HTMLInputElement).checked;
+            const { error } = await supabase
+                .from("checklist_items")
+                .update({
+                    done: checked,
+                    done_by: checked ? getCurrentUser() : null,
+                })
+                .eq("id", id);
+            if (error) console.error("Error actualizando tarea:", error);
+        }
+
+        if (target.classList.contains("delete-btn")) {
+            const { error } = await supabase
+                .from("checklist_items")
+                .delete()
+                .eq("id", id);
+            if (error) console.error("Error borrando tarea:", error);
+        }
+    });
+
+    const channel = supabase
+        .channel("checklist_items_changes")
+        .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "checklist_items" },
+            () => {
+                loadItems();
+            },
+        )
+        .subscribe();
+
+    window.addEventListener("beforeunload", () => {
+        channel.unsubscribe();
+    });
+
+    loadItems();
+</script>

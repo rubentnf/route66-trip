@@ -43,9 +43,97 @@ import { days } from "../data/trip";
     }
 </div>
 
+<style is:global>
+    .day-card {
+        scroll-margin-top: 160px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background: white;
+        border: 2px solid var(--color-navy);
+        border-radius: 8px;
+        box-shadow: 4px 4px 0 var(--color-navy);
+        position: relative;
+    }
+    .day-card__header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 0.75rem;
+    }
+    .day-card__badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--color-rust);
+        color: white;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+        border: 3px solid var(--color-navy);
+    }
+    .day-card__badge--route66 {
+        background: var(--color-mustard);
+        font-size: 1.3rem;
+    }
+    .day-card__date {
+        margin: 0;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--color-turquoise);
+        font-weight: 600;
+    }
+    .day-card h3 {
+        margin: 0;
+        font-size: 1.2rem;
+    }
+    .day-card ul {
+        margin: 0;
+        padding-left: 1.2rem;
+    }
+    .day-card__overnight {
+        margin-top: 0.75rem;
+        font-weight: 600;
+        color: var(--color-navy);
+    }
+    .day-card--today {
+        border-color: var(--color-turquoise);
+        border-width: 3px;
+        box-shadow: 4px 4px 0 var(--color-turquoise);
+    }
+    .day-card:not(:last-child)::after {
+        content: "";
+        display: block;
+        height: 3px;
+        background: repeating-linear-gradient(
+            90deg,
+            var(--color-mustard) 0px,
+            var(--color-mustard) 12px,
+            transparent 12px,
+            transparent 24px
+        );
+        margin-top: 1.5rem;
+    }
+
+    body.theme-vegas .day-card {
+        background: #170f2e;
+        box-shadow:
+            4px 4px 0 var(--color-rust),
+            0 0 20px rgba(255, 45, 149, 0.15);
+    }
+    body.theme-vegas .day-card--today {
+        box-shadow:
+            4px 4px 0 var(--color-turquoise),
+            0 0 24px rgba(0, 229, 255, 0.35);
+    }
+</style>
+
 <script>
-    import { days as allDays } from "../data/trip";
-    import { getEffectiveNow } from "../utils/tripDate";
+    import { getTodayTrip } from "../utils/tripDate";
 
     const cards = document.querySelectorAll<HTMLElement>(".day-card");
 
@@ -75,8 +163,7 @@ import { days } from "../data/trip";
     }, 50);
 
     // Resalta la tarjeta del día actual, respetando el flag ?debugDate si está presente
-    const todayStr = getEffectiveNow().toISOString().split("T")[0];
-    const todayTrip = allDays.find((d) => d.date === todayStr);
+    const todayTrip = getTodayTrip();
     if (todayTrip) {
         document
             .getElementById(`day-${todayTrip.id}`)

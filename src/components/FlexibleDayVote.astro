@@ -129,8 +129,8 @@
 </style>
 
 <script>
-    import { supabase } from "../lib/supabase";
-    import { DIVAS_PROFILES, getCurrentUser } from "../utils/identity";
+    import { supabase, subscribeToTable } from "../lib/supabase";
+    import { avatarOf, getCurrentUser } from "../utils/identity";
 
     // Opciones fijas, basadas en las ideas de la infografía para el día flexible.
     // Edita este array libremente si queréis añadir/quitar opciones.
@@ -147,10 +147,6 @@
     type VoteRow = { participant: string; option: string };
 
     let votes: VoteRow[] = [];
-
-    function avatarOf(name: string): string {
-        return DIVAS_PROFILES.find((p) => p.name === name)?.avatar ?? "";
-    }
 
     function render() {
         const currentUser = getCurrentUser();
@@ -222,18 +218,7 @@
         if (error) console.error("Error votando:", error);
     });
 
-    const channel = supabase
-        .channel("flexible_day_votes_changes")
-        .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "flexible_day_votes" },
-            () => loadVotes(),
-        )
-        .subscribe();
-
-    window.addEventListener("beforeunload", () => {
-        channel.unsubscribe();
-    });
+    subscribeToTable("flexible_day_votes", loadVotes);
 
     loadVotes();
 </script>

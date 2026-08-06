@@ -12,3 +12,62 @@ import TripTimeline from "../components/TripTimeline.astro";
 		<TripTimeline />
 	</div>
 </BaseLayout>
+
+<style is:global>
+	.trip-layout {
+		display: grid;
+		gap: 1.5rem;
+	}
+	.map-slot {
+		position: sticky;
+		top: 0;
+		z-index: 10;
+		height: 45vh;
+		min-height: 260px;
+		max-height: 400px;
+		transition: height 0.3s ease;
+		cursor: pointer;
+		overflow: hidden;
+		border: 3px solid var(--color-navy);
+		border-radius: 12px;
+		margin-top: 1rem;
+	}
+	.map-slot #trip-map {
+		height: 100% !important;
+	}
+	body.map-expanded .map-slot {
+		height: 70vh;
+	}
+
+	@media (min-width: 769px) {
+		.trip-layout {
+			grid-template-columns: 1fr 1fr;
+			align-items: start;
+		}
+		.map-slot {
+			height: auto;
+			min-height: auto;
+			max-height: none;
+			position: sticky;
+			top: 1rem;
+			cursor: default;
+		}
+		.map-slot #trip-map {
+			height: calc(100vh - 2rem) !important;
+		}
+	}
+
+	@media (max-width: 768px) {
+		body.theme-vegas .map-slot .leaflet-tile-pane {
+			filter: saturate(1.9) hue-rotate(220deg) brightness(0.55)
+				contrast(1.25);
+			transition: filter 0.6s ease;
+		}
+		body.theme-vegas .map-slot {
+			box-shadow:
+				0 0 18px var(--color-rust),
+				0 0 8px var(--color-turquoise) inset;
+			transition: box-shadow 0.6s ease;
+		}
+	}
+</style>

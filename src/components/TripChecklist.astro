@@ -14,7 +14,7 @@
     <ul id="checklist-list" class="checklist__list"></ul>
 </div>
 
-<style>
+<style is:global>
     .checklist {
         padding: 1.5rem;
         background: white;
@@ -22,12 +22,6 @@
         border-radius: 8px;
         box-shadow: 4px 4px 0 var(--color-navy);
         margin-bottom: 1.5rem;
-    }
-    .checklist__user-select {
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
     }
     .checklist__form {
         display: flex;
@@ -80,12 +74,9 @@
 </style>
 
 <script>
-    import { supabase } from "../lib/supabase";
-    import { DIVAS, getCurrentUser, setCurrentUser } from "../utils/identity";
+    import { supabase, subscribeToTable } from "../lib/supabase";
+    import { getCurrentUser } from "../utils/identity";
 
-    const userSelect = document.getElementById(
-        "user-select",
-    ) as HTMLSelectElement;
     const form = document.getElementById("checklist-form") as HTMLFormElement;
     const input = document.getElementById("new-task") as HTMLInputElement;
     const list = document.getElementById("checklist-list")!;
@@ -163,20 +154,7 @@
         }
     });
 
-    const channel = supabase
-        .channel("checklist_items_changes")
-        .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "checklist_items" },
-            () => {
-                loadItems();
-            },
-        )
-        .subscribe();
-
-    window.addEventListener("beforeunload", () => {
-        channel.unsubscribe();
-    });
+    subscribeToTable("checklist_items", loadItems);
 
     loadItems();
 </script>

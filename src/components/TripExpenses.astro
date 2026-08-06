@@ -328,8 +328,9 @@
 </style>
 
 <script>
-    import { supabase } from "../lib/supabase";
-    import { DIVAS_PROFILES, getCurrentUser } from "../utils/identity";
+    import { supabase, subscribeToTable } from "../lib/supabase";
+    import { DIVAS, DIVAS_PROFILES, avatarOf, getCurrentUser } from "../utils/identity";
+    import { formatEUR } from "../utils/format";
 
     const CATEGORIES: Record<string, string> = {
         Comida: "🍔",
@@ -372,18 +373,18 @@
         )
         .join("");
 
-    function avatarOf(name: string): string {
-        return DIVAS_PROFILES.find((p) => p.name === name)?.avatar ?? "";
-    }
-
-    paidByDiv.innerHTML = DIVAS_PROFILES.map(
-        (p) => `
-    <div class="avatar-pick" data-name="${p.name}">
+    function renderAvatarOptions(activeNames: string[]): string {
+        return DIVAS_PROFILES.map(
+            (p) => `
+    <div class="avatar-pick${activeNames.includes(p.name) ? " active" : ""}" data-name="${p.name}">
       <img src="${p.avatar}" alt="${p.name}" />
       <span>${p.name}</span>
     </div>
   `,
-    ).join("");
+        ).join("");
+    }
+
+    paidByDiv.innerHTML = renderAvatarOptions([]);
 
     let paidBy = getCurrentUser() ?? DIVAS_PROFILES[0].name;
     function renderPaidBy() {
@@ -404,14 +405,7 @@
     });
     renderPaidBy();
 
-    participantsDiv.innerHTML = DIVAS_PROFILES.map(
-        (p) => `
-    <div class="avatar-pick active" data-name="${p.name}">
-      <img src="${p.avatar}" alt="${p.name}" />
-      <span>${p.name}</span>
-    </div>
-  `,
-    ).join("");
+    participantsDiv.innerHTML = renderAvatarOptions(DIVAS);
     participantsDiv.addEventListener("click", (e) => {
         const pick = (e.target as HTMLElement).closest(
             ".avatar-pick",
@@ -448,7 +442,7 @@
 
     function renderTotal(expenses: ExpenseRow[]) {
         const total = expenses.reduce((sum, e) => sum + e.amount, 0);
-        totalAmountEl.textContent = `${total.toFixed(2)}€`;
+        totalAmountEl.textContent = formatEUR(total);
     }
 
     function renderExpenses(expenses: ExpenseRow[]) {
@@ -469,7 +463,7 @@
               ${exp.paid_by} · ${date}
             </div>
           </div>
-          <div class="expense-amount">${exp.amount.toFixed(2)}€</div>
+          <div class="expense-amount">${formatEUR(exp.amount)}</div>
           <button class="delete-btn" title="Eliminar">✕</button>
         </li>
       `;
@@ -478,7 +472,7 @@
     }
 
     function renderBalances(expenses: ExpenseRow[]) {
-        const names = DIVAS_PROFILES.map((p) => p.name);
+        const names = DIVAS;
         const paid: Record<string, number> = {};
         const owed: Record<string, number> = {};
         names.forEach((n) => {
@@ -512,9 +506,9 @@
                           : "zero";
                 const label =
                     amount > 0.01
-                        ? `+${amount.toFixed(2)}€`
+                        ? `+${formatEUR(amount)}`
                         : amount < -0.01
-                          ? `${amount.toFixed(2)}€`
+                          ? formatEUR(amount)
                           : "0€";
                 return `
         <div class="balance-person">
@@ -540,7 +534,7 @@
             <span class="arrow">→</span>
             <img src="${avatarOf(s.to)}" alt="${s.to}" />
             <span>${s.to}</span>
-            <span class="amount">${s.amount.toFixed(2)}€</span>
+            <span class="amount">${formatEUR(s.amount)}</span>
           </div>
         `,
                       )
@@ -639,23 +633,8 @@
         if (error) console.error("Error borrando gasto:", error);
     });
 
-    const channel = supabase
-        .channel("expenses_changes")
-        .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "expenses" },
-            () => loadExpenses(),
-        )
-        .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "expense_participants" },
-            () => loadExpenses(),
-        )
-        .subscribe();
-
-    window.addEventListener("beforeunload", () => {
-        channel.unsubscribe();
-    });
+    subscribeToTable("expenses", loadExpenses);
+    subscribeToTable("expense_participants", loadExpenses);
 
     loadExpenses();
 </script>

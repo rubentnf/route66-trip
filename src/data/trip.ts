@@ -17,6 +17,10 @@ export interface TripDay {
     transportIcon?: "flight" | "car" | null;
 }
 
+export function getDayById(id: number): TripDay | undefined {
+    return days.find((d) => d.id === id);
+}
+
 export const locations: Location[] = [
     { id: "sf", name: "San Francisco", lat: 37.7749, lng: -122.4194, colorGroup: "purple" },
     { id: "mariposa", name: "Mariposa", lat: 37.4849, lng: -119.9663, colorGroup: "purple" },

@@ -151,9 +151,9 @@ import { days } from "../data/trip";
 </style>
 
 <script>
-    import { supabase } from "../lib/supabase";
+    import { supabase, subscribeToTable } from "../lib/supabase";
     import { getCurrentUser } from "../utils/identity";
-    import { days } from "../data/trip";
+    import { getDayById } from "../data/trip";
 
     const form = document.getElementById("photo-form") as HTMLFormElement;
     const fileInput = document.getElementById(
@@ -182,7 +182,7 @@ import { days } from "../data/trip";
 
     function dayTitle(dayId: number | null): string {
         if (dayId === null) return "General";
-        const day = days.find((d) => d.id === dayId);
+        const day = getDayById(dayId);
         return day ? `Día ${day.id} · ${day.title}` : "General";
     }
 
@@ -298,18 +298,7 @@ import { days } from "../data/trip";
         if (dbError) console.error("Error borrando registro:", dbError);
     });
 
-    const channel = supabase
-        .channel("photos_changes")
-        .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "photos" },
-            () => loadPhotos(),
-        )
-        .subscribe();
-
-    window.addEventListener("beforeunload", () => {
-        channel.unsubscribe();
-    });
+    subscribeToTable("photos", loadPhotos);
 
     loadPhotos();
 </script>

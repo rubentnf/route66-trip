@@ -16,7 +16,7 @@
 
 <script>
     import { days } from "../data/trip";
-    import { getEffectiveNow } from "../utils/tripDate";
+    import { getEffectiveNow, getTodayTrip } from "../utils/tripDate";
 
     const el = document.getElementById("trip-status")!;
 
@@ -36,8 +36,7 @@
             el.classList.remove("trip-status--live");
         } else if (now >= tripStart && now <= tripEnd) {
             // DURANTE el viaje: modo "hoy"
-            const todayStr = now.toISOString().split("T")[0];
-            const todayTrip = days.find((d) => d.date === todayStr);
+            const todayTrip = getTodayTrip();
 
             if (todayTrip) {
                 el.textContent = `📍 Hoy es el Día ${todayTrip.id}: ${todayTrip.title}`;

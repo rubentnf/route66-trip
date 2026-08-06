@@ -19,3 +19,7 @@ export function getCurrentUser(): string | null {
 export function setCurrentUser(name: string) {
     localStorage.setItem('trip-user', name);
 }
+
+export function avatarOf(name: string): string {
+    return DIVAS_PROFILES.find((p) => p.name === name)?.avatar ?? '';
+}

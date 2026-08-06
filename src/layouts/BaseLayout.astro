@@ -39,7 +39,9 @@ const { title, hideNav = false } = Astro.props;
         </script>
     </head>
     <body>
-        <a href="/" class="site-title"><h1>Divas en Ruta</h1></a>
+        <a href="/" class="site-title">
+            <img src="/logo.png" alt="Divas en Ruta" class="site-logo" />
+        </a>
         {!hideNav && <NavBar />}
         <TripStatus />
         <main>
@@ -62,12 +64,23 @@ const { title, hideNav = false } = Astro.props;
     }
 
     .site-title {
-        text-decoration: none;
-        display: block;
+        display: flex;
+        justify-content: center;
+        padding: 1rem;
+        background: var(--color-sand-dark);
+        border-bottom: 4px solid var(--color-rust);
     }
-    .site-title h1 {
+    .site-logo {
+        height: 20vh;
+        width: auto;
         cursor: pointer;
     }
+
+   /*  @media (max-width: 600px) {
+        .site-logo {
+            height: 80px;
+        }
+    } */
 
     body {
         background: var(--color-sand);
@@ -128,6 +141,8 @@ const { title, hideNav = false } = Astro.props;
         }
         .map-slot {
             height: auto;
+            min-height: auto;
+            max-height: none;
             position: sticky;
             top: 1rem;
             cursor: default;

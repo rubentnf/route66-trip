@@ -25,7 +25,8 @@ const { title, hideNav = false } = Astro.props;
         <script is:inline>
             (function () {
                 const isIdentityPage =
-                    window.location.pathname === "/identidad";
+                    window.location.pathname.replace(/\/$/, "") ===
+                    "/identidad";
                 const hasUser = localStorage.getItem("trip-user");
                 if (!hasUser && !isIdentityPage) {
                     sessionStorage.setItem(

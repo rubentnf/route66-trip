@@ -1,0 +1,315 @@
+---
+import { days } from "../data/trip";
+---
+
+<div class="gallery">
+    <h2>📸 Galería del viaje</h2>
+
+    <form id="photo-form" class="gallery__form">
+        <input type="file" id="photo-input" accept="image/*" required />
+        <select id="photo-day">
+            <option value="">General (sin día concreto)</option>
+            {
+                days.map((day) => (
+                    <option value={day.id}>
+                        Día {day.id} · {day.title}
+                    </option>
+                ))
+            }
+        </select>
+        <input
+            type="text"
+            id="photo-caption"
+            placeholder="Comentario (opcional)"
+        />
+        <button type="submit">Subir foto</button>
+        <p id="upload-status" class="gallery__status"></p>
+    </form>
+
+    <div class="gallery__filter">
+        <label for="filter-day">Filtrar por día:</label>
+        <select id="filter-day">
+            <option value="all">Todas</option>
+            <option value="">General</option>
+            {
+                days.map((day) => (
+                    <option value={day.id}>
+                        Día {day.id} · {day.title}
+                    </option>
+                ))
+            }
+        </select>
+    </div>
+
+    <div id="photo-grid" class="gallery__grid"></div>
+</div>
+
+<style is:global>
+    .gallery {
+        padding: 1.5rem;
+        background: white;
+        border: 2px solid var(--color-navy);
+        border-radius: 8px;
+        box-shadow: 4px 4px 0 var(--color-navy);
+        margin-bottom: 1.5rem;
+    }
+    .gallery__form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px dashed #e5e5e5;
+    }
+    .gallery__form input,
+    .gallery__form select {
+        padding: 0.5rem;
+        border: 2px solid var(--color-navy);
+        border-radius: 6px;
+    }
+    .gallery__form button {
+        padding: 0.5rem 1rem;
+        background: var(--color-rust);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .gallery__status {
+        width: 100%;
+        margin: 0;
+        font-size: 0.85rem;
+        color: var(--color-turquoise);
+    }
+    .gallery__filter {
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .gallery__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 0.5rem;
+    }
+    .gallery__item {
+        position: relative;
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid var(--color-navy);
+        aspect-ratio: 1;
+        cursor: pointer;
+    }
+    .gallery__item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    .gallery__item .item-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+        color: white;
+        padding: 1rem 0.4rem 0.3rem;
+        font-size: 0.62rem;
+        line-height: 1.2;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+    }
+    .gallery__item:hover .item-overlay {
+        opacity: 1;
+    }
+    .gallery__item .delete-btn {
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        background: rgba(0, 0, 0, 0.55);
+        border: none;
+        color: white;
+        border-radius: 4px;
+        width: 20px;
+        height: 20px;
+        font-size: 0.7rem;
+        cursor: pointer;
+        line-height: 1;
+    }
+
+    /* En móvil, miniaturas todavía más pequeñas para que quepan varias por fila */
+    @media (max-width: 480px) {
+        .gallery__grid {
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        }
+        .gallery__item .item-overlay {
+            opacity: 1; /* en móvil no hay hover, mostramos el texto siempre */
+            font-size: 0.55rem;
+        }
+    }
+</style>
+
+<script>
+    import { supabase } from "../lib/supabase";
+    import { getCurrentUser } from "../utils/identity";
+    import { days } from "../data/trip";
+
+    const form = document.getElementById("photo-form") as HTMLFormElement;
+    const fileInput = document.getElementById(
+        "photo-input",
+    ) as HTMLInputElement;
+    const daySelect = document.getElementById("photo-day") as HTMLSelectElement;
+    const captionInput = document.getElementById(
+        "photo-caption",
+    ) as HTMLInputElement;
+    const statusEl = document.getElementById("upload-status")!;
+    const filterSelect = document.getElementById(
+        "filter-day",
+    ) as HTMLSelectElement;
+    const grid = document.getElementById("photo-grid")!;
+
+    type PhotoRow = {
+        id: string;
+        storage_path: string;
+        uploaded_by: string;
+        day_id: number | null;
+        caption: string | null;
+        created_at: string;
+    };
+
+    let allPhotos: PhotoRow[] = [];
+
+    function dayTitle(dayId: number | null): string {
+        if (dayId === null) return "General";
+        const day = days.find((d) => d.id === dayId);
+        return day ? `Día ${day.id} · ${day.title}` : "General";
+    }
+
+    function getPublicUrl(path: string): string {
+        const { data } = supabase.storage
+            .from("trip-photos")
+            .getPublicUrl(path);
+        return data.publicUrl;
+    }
+
+    async function loadPhotos() {
+        const { data, error } = await supabase
+            .from("photos")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+        if (error) {
+            console.error("Error cargando fotos:", error);
+            return;
+        }
+        allPhotos = (data ?? []) as PhotoRow[];
+        renderGrid();
+    }
+
+    function renderGrid() {
+        const filter = filterSelect.value;
+        const filtered =
+            filter === "all"
+                ? allPhotos
+                : allPhotos.filter((p) =>
+                      filter === ""
+                          ? p.day_id === null
+                          : p.day_id === Number(filter),
+                  );
+
+        grid.innerHTML = filtered
+            .map(
+                (photo) => `
+      <div class="gallery__item" data-id="${photo.id}">
+        <img src="${getPublicUrl(photo.storage_path)}" alt="${photo.caption ?? ""}" loading="lazy" />
+        <button class="delete-btn" title="Eliminar">✕</button>
+        <div class="item-overlay">
+          ${photo.caption ? `${photo.caption}<br/>` : ""}
+          ${dayTitle(photo.day_id)} · ${photo.uploaded_by}
+        </div>
+      </div>
+    `,
+            )
+            .join("");
+    }
+
+    filterSelect.addEventListener("change", renderGrid);
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const file = fileInput.files?.[0];
+        if (!file) return;
+
+        statusEl.textContent = "Subiendo...";
+
+        const ext = file.name.split(".").pop();
+        const fileName = `${crypto.randomUUID()}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from("trip-photos")
+            .upload(fileName, file);
+
+        if (uploadError) {
+            console.error("Error subiendo la foto:", uploadError);
+            statusEl.textContent = "Error al subir 😕";
+            return;
+        }
+
+        const { error: insertError } = await supabase.from("photos").insert({
+            storage_path: fileName,
+            uploaded_by: getCurrentUser() ?? "Anónima",
+            day_id: daySelect.value ? Number(daySelect.value) : null,
+            caption: captionInput.value.trim() || null,
+        });
+
+        if (insertError) {
+            console.error("Error guardando metadatos:", insertError);
+            statusEl.textContent = "Error al guardar 😕";
+            return;
+        }
+
+        statusEl.textContent = "¡Foto subida! 🎉";
+        form.reset();
+        setTimeout(() => {
+            statusEl.textContent = "";
+        }, 2500);
+    });
+
+    grid.addEventListener("click", async (e) => {
+        const target = e.target as HTMLElement;
+        if (!target.classList.contains("delete-btn")) return;
+        const item = target.closest(".gallery__item") as HTMLElement;
+        const id = item?.dataset.id;
+        const photo = allPhotos.find((p) => p.id === id);
+        if (!photo) return;
+
+        const { error: storageError } = await supabase.storage
+            .from("trip-photos")
+            .remove([photo.storage_path]);
+
+        if (storageError)
+            console.error("Error borrando archivo:", storageError);
+
+        const { error: dbError } = await supabase
+            .from("photos")
+            .delete()
+            .eq("id", id);
+        if (dbError) console.error("Error borrando registro:", dbError);
+    });
+
+    const channel = supabase
+        .channel("photos_changes")
+        .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "photos" },
+            () => loadPhotos(),
+        )
+        .subscribe();
+
+    window.addEventListener("beforeunload", () => {
+        channel.unsubscribe();
+    });
+
+    loadPhotos();
+</script>

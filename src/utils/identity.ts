@@ -1,8 +1,16 @@
-// Identidad ligera: no hay login real, solo un selector de nombre
-// guardado en localStorage. Suficiente para saber "quién metió qué gasto"
-// sin montar autenticación completa para un grupo de 4-5 personas.
+export interface DivaProfile {
+    name: string;
+    avatar: string;
+    tagline: string;
+}
 
-export const DIVAS = ['Ruben', 'Stephie', 'Saray']; // ajusta a los nombres reales del grupo
+export const DIVAS_PROFILES: DivaProfile[] = [
+    { name: 'Ruben', avatar: '/avatars/ruben.png', tagline: 'El pistolero más rápido con el mapa' },
+    { name: 'Stephie', avatar: '/avatars/stephie.jpeg', tagline: 'La reina indiscutible del Strip' },
+    { name: 'Saray', avatar: '/avatars/saray.jpeg', tagline: 'La forajida que nunca pierde el rumbo' },
+];
+
+export const DIVAS = DIVAS_PROFILES.map((d) => d.name);
 
 export function getCurrentUser(): string | null {
     return localStorage.getItem('trip-user');

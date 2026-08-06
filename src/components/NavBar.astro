@@ -1,0 +1,57 @@
+---
+const currentPath = Astro.url.pathname;
+
+const links = [
+    { href: "/", label: "🗺️ Viaje" },
+    { href: "/checklist", label: "✅ Checklist" },
+    { href: "/gastos", label: "💸 Gastos" },
+    { href: "/galeria", label: "📸 Galería" },
+    { href: "/playlist", label: "🎵 Playlist" },
+    { href: "/votacion", label: "🗳️ Votación" },
+    { href: "/identidad", label: "🤠 Cambiar diva" },
+];
+---
+
+<nav class="navbar">
+    {
+        links.map((link) => (
+            <a
+                href={link.href}
+                class:list={[
+                    "navbar__link",
+                    { "navbar__link--active": currentPath === link.href },
+                ]}
+            >
+                {link.label}
+            </a>
+        ))
+    }
+</nav>
+
+<style>
+    .navbar {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        background: var(--color-navy);
+        overflow-x: auto;
+    }
+    .navbar__link {
+        color: white;
+        text-decoration: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-family: var(--font-display);
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+        transition: background 0.2s ease;
+    }
+    .navbar__link:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+    .navbar__link--active {
+        background: var(--color-rust);
+    }
+</style>

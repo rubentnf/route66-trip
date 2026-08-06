@@ -1,11 +1,6 @@
 <div class="checklist">
     <h2>✅ Checklist del viaje</h2>
 
-    <div class="checklist__user-select">
-        <label for="user-select">Soy:</label>
-        <select id="user-select"></select>
-    </div>
-
     <form id="checklist-form" class="checklist__form">
         <input
             type="text"
@@ -94,18 +89,6 @@
     const form = document.getElementById("checklist-form") as HTMLFormElement;
     const input = document.getElementById("new-task") as HTMLInputElement;
     const list = document.getElementById("checklist-list")!;
-
-    // Rellena el selector de "quién eres" y recupera la selección guardada
-    userSelect.innerHTML = DIVAS.map(
-        (name) => `<option value="${name}">${name}</option>`,
-    ).join("");
-    const savedUser = getCurrentUser();
-    if (savedUser) userSelect.value = savedUser;
-    else setCurrentUser(DIVAS[0]); // por defecto, la primera de la lista
-
-    userSelect.addEventListener("change", () =>
-        setCurrentUser(userSelect.value),
-    );
 
     // Carga inicial de items
     async function loadItems() {

@@ -1,12 +1,22 @@
 ---
+import { Image } from "astro:assets";
+import { ClientRouter } from "astro:transitions";
 import TripStatus from "../components/TripStatus.astro";
 import NavBar from "../components/NavBar.astro";
+import logo from "../assets/logo.png";
 
 interface Props {
     title: string;
     hideNav?: boolean;
+    hideLogo?: boolean;
+    hideStatus?: boolean;
 }
-const { title, hideNav = false } = Astro.props;
+const {
+    title,
+    hideNav = false,
+    hideLogo = false,
+    hideStatus = false,
+} = Astro.props;
 ---
 
 <html lang="es">
@@ -18,9 +28,10 @@ const { title, hideNav = false } = Astro.props;
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
-            href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Work+Sans:wght@400;500;600&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Anton&family=Work+Sans:wght@400;500;600&display=swap"
             rel="stylesheet"
         />
+        <ClientRouter />
 
         <script is:inline>
             (function () {
@@ -39,11 +50,22 @@ const { title, hideNav = false } = Astro.props;
         </script>
     </head>
     <body>
-        <a href="/" class="site-title">
-            <img src="/logo.png" alt="Divas en Ruta" class="site-logo" />
-        </a>
+        {
+            !hideLogo && (
+                <a href="/" class="site-title">
+                    <Image
+                        src={logo}
+                        alt="Divas en Ruta"
+                        class="site-logo"
+                        width={700}
+                        loading="eager"
+                        fetchpriority="high"
+                    />
+                </a>
+            )
+        }
         {!hideNav && <NavBar />}
-        <TripStatus />
+        {!hideStatus && <TripStatus />}
         <main>
             <slot />
         </main>
@@ -76,17 +98,14 @@ const { title, hideNav = false } = Astro.props;
         cursor: pointer;
     }
 
-   /*  @media (max-width: 600px) {
-        .site-logo {
-            height: 80px;
-        }
-    } */
-
     body {
         background: var(--color-sand);
         color: var(--color-navy);
         font-family: var(--font-body);
         margin: 0;
+        transition:
+            background 0.6s ease,
+            color 0.6s ease;
     }
 
     h1,
@@ -109,18 +128,24 @@ const { title, hideNav = false } = Astro.props;
         padding: 0 1rem 2rem;
     }
 
-    body.theme-vegas {
+    body[data-theme="vegas"] {
         --color-sand: #0f0a1e;
         --color-sand-dark: #1a1030;
         --color-navy: #f5f0ff;
         --color-rust: #ff2d95;
         --color-turquoise: #00e5ff;
         --color-mustard: #ffd60a;
-        transition:
-            background 0.6s ease,
-            color 0.6s ease;
     }
-    body.theme-vegas h1 {
+    body[data-theme="vegas"] h1 {
         text-shadow: 0 0 12px var(--color-rust);
+    }
+
+    body[data-theme="desert"] {
+        --color-sand: #fbe9d0;
+        --color-sand-dark: #f0d3a0;
+        --color-navy: #5c2e0f;
+        --color-rust: #b83a1e;
+        --color-turquoise: #c98a2c;
+        --color-mustard: #e2a63c;
     }
 </style>

@@ -1,49 +1,184 @@
 ---
-import { days } from "../data/trip";
+import { days, locations, getWeekday } from "../data/trip";
+import {
+    getWeatherForDay,
+    describeWeatherCode,
+    getWeatherWarning,
+} from "../utils/weather";
+import { getTripRoute } from "../utils/route";
+import { getSunTimes } from "../utils/sun";
+
+const locById = new Map(locations.map((l) => [l.id, l]));
+const referenceYear = new Date().getFullYear() - 1;
+const { distanceKmByDayId } = await getTripRoute();
+
+const seenLocations = new Set<string>();
+const funFactByDayId = new Map<number, string>();
+for (const day of days) {
+    if (seenLocations.has(day.locationId)) continue;
+    seenLocations.add(day.locationId);
+    const fact = locById.get(day.locationId)?.funFact;
+    if (fact) funFactByDayId.set(day.id, fact);
+}
+
+async function mapWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+    const results: R[] = new Array(items.length);
+    let index = 0;
+    async function worker() {
+        while (index < items.length) {
+            const current = index++;
+            results[current] = await fn(items[current]);
+        }
+    }
+    await Promise.all(Array.from({ length: limit }, worker));
+    return results;
+}
+
+const daysWithWeather = await mapWithConcurrency(days, 3, async (day) => {
+    const loc = locById.get(day.locationId);
+    const [weather, sun] = loc
+        ? await Promise.all([
+              getWeatherForDay(loc.lat, loc.lng, day.date, referenceYear),
+              getSunTimes(loc.lat, loc.lng, day.date, loc.timezone),
+          ])
+        : [null, null];
+    return {
+        day,
+        weather,
+        warning: weather ? getWeatherWarning(weather) : null,
+        sun,
+        distanceKm: distanceKmByDayId[day.id],
+        funFact: funFactByDayId.get(day.id),
+    };
+});
 ---
 
 <div class="timeline">
     {
-        days.map((day) => (
-            <article
-                id={`day-${day.id}`}
-                class="day-card"
-                data-location-id={day.locationId}
-            >
-                <div class="day-card__header">
-                    <span
-                        class="day-card__badge"
-                        class:list={{
-                            "day-card__badge--route66": day.id === 11,
-                        }}
-                    >
-                        {day.id === 11 ? "🛣️" : day.id}
-                    </span>
-                    <div>
-                        <p class="day-card__date">
-                            {day.weekday} ·{" "}
-                            {new Date(day.date).toLocaleDateString("es-ES", {
-                                day: "2-digit",
-                                month: "short",
-                            })}
-                        </p>
-                        <h3>{day.title}</h3>
+        daysWithWeather.map(
+            ({ day, weather, sun, warning, distanceKm, funFact }) => (
+                <article
+                    id={`day-${day.id}`}
+                    class="day-card"
+                    data-location-id={day.locationId}
+                >
+                    <div class="day-card__header">
+                        <span
+                            class="day-card__badge"
+                            class:list={{
+                                "day-card__badge--route66":
+                                    day.locationId === "route66",
+                            }}
+                        >
+                            {day.locationId === "route66" ? "🛣️" : day.id}
+                        </span>
+                        <div>
+                            <p class="day-card__date">
+                                {getWeekday(day.date)} ·{" "}
+                                {new Date(day.date).toLocaleDateString(
+                                    "es-ES",
+                                    {
+                                        day: "2-digit",
+                                        month: "short",
+                                    },
+                                )}
+                            </p>
+                            <h3>{day.title}</h3>
+                            {weather && (
+                                <p class="day-card__weather">
+                                    {
+                                        describeWeatherCode(weather.weatherCode)
+                                            .icon
+                                    }
+                                    {Math.round(weather.tempMax)}° /{" "}
+                                    {Math.round(weather.tempMin)}°
+                                    <span class="day-card__weather-year">
+                                        {weather.source === "forecast"
+                                            ? "previsión"
+                                            : `${referenceYear} aprox.`}
+                                    </span>
+                                </p>
+                            )}
+                            {sun && (
+                                <p class="day-card__sun">
+                                    🌅 {sun.sunrise} · 🌇 {sun.sunset}
+                                </p>
+                            )}
+                            {distanceKm !== undefined && (
+                                <p class="day-card__distance">
+                                    🚗 {distanceKm} km hasta aquí
+                                </p>
+                            )}
+                        </div>
                     </div>
-                </div>
-                <ul>
-                    {day.activities.map((act) => (
-                        <li>{act}</li>
-                    ))}
-                </ul>
-                {day.overnight && (
-                    <p class="day-card__overnight">🌙 {day.overnight}</p>
-                )}
-            </article>
-        ))
+                    {warning && (
+                        <p class="day-card__warning">
+                            {warning.icon} {warning.message}
+                        </p>
+                    )}
+                    <ul>
+                        {day.activities.map((act) => (
+                            <li>{act}</li>
+                        ))}
+                    </ul>
+                    {funFact && <p class="day-card__fact">🎲 {funFact}</p>}
+                    {day.overnight && (
+                        <p class="day-card__overnight">🌙 {day.overnight}</p>
+                    )}
+                </article>
+            ),
+        )
     }
 </div>
 
+<button
+    id="jump-to-today"
+    class="jump-to-today"
+    type="button"
+    aria-label="Ir al día de hoy"
+>
+    📍 Hoy</button
+>
+
 <style is:global>
+    .jump-to-today {
+        position: fixed;
+        right: 1.25rem;
+        bottom: 1.25rem;
+        z-index: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: var(--color-rust);
+        color: white;
+        border: none;
+        border-radius: 999px;
+        padding: 0.7rem 1.1rem;
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+        cursor: pointer;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(8px);
+        transition:
+            opacity 0.2s ease,
+            transform 0.2s ease;
+    }
+
+    .jump-to-today.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+    }
+
     .day-card {
         scroll-margin-top: 160px;
         padding: 1.5rem;
@@ -74,6 +209,54 @@ import { days } from "../data/trip";
         font-size: 1.1rem;
         flex-shrink: 0;
         border: 3px solid var(--color-navy);
+    }
+
+    .day-card__weather {
+        margin: 0.35rem 0 0;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--color-navy);
+        display: flex;
+        align-items: baseline;
+        gap: 0.3rem;
+    }
+
+    .day-card__weather-year {
+        font-weight: 400;
+        font-size: 0.68rem;
+        color: #94a3b8;
+    }
+    .day-card__distance {
+        margin: 0.25rem 0 0;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #78716c;
+    }
+    .day-card__sun {
+        margin: 0.25rem 0 0;
+        font-size: 0.72rem;
+        color: #78716c;
+    }
+    .day-card__fact {
+        margin-top: 0.75rem;
+        padding: 0.6rem 0.75rem;
+        background: var(--color-sand);
+        border-left: 3px solid var(--color-mustard);
+        border-radius: 0 6px 6px 0;
+        font-size: 0.8rem;
+        font-style: italic;
+        color: var(--color-navy);
+    }
+
+    .day-card__warning {
+        margin: 0.75rem 0 0;
+        padding: 0.6rem 0.75rem;
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #9a3412;
     }
     .day-card__badge--route66 {
         background: var(--color-mustard);
@@ -119,13 +302,13 @@ import { days } from "../data/trip";
         margin-top: 1.5rem;
     }
 
-    body.theme-vegas .day-card {
+    body[data-theme="vegas"] .day-card {
         background: #170f2e;
         box-shadow:
             4px 4px 0 var(--color-rust),
             0 0 20px rgba(255, 45, 149, 0.15);
     }
-    body.theme-vegas .day-card--today {
+    body[data-theme="vegas"] .day-card--today {
         box-shadow:
             4px 4px 0 var(--color-turquoise),
             0 0 24px rgba(0, 229, 255, 0.35);
@@ -135,38 +318,77 @@ import { days } from "../data/trip";
 <script>
     import { getTodayTrip } from "../utils/tripDate";
 
-    const cards = document.querySelectorAll<HTMLElement>(".day-card");
+    let observer: IntersectionObserver | undefined;
+    let todayObserver: IntersectionObserver | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    const observer = new IntersectionObserver(
-        (entries) => {
-            entries.forEach((entry) => {
-                if (entry.isIntersecting) {
-                    const locationId =
-                        entry.target.getAttribute("data-location-id");
-                    window.dispatchEvent(
-                        new CustomEvent("trip:day-active", {
-                            detail: { locationId },
-                        }),
+    // astro:page-load se dispara en la carga inicial y en cada navegación
+    // por View Transitions; salimos si esta página no tiene timeline.
+    document.addEventListener("astro:page-load", () => {
+        const cards = document.querySelectorAll<HTMLElement>(".day-card");
+        if (cards.length === 0) return;
+
+        observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        const locationId =
+                            entry.target.getAttribute("data-location-id");
+                        window.dispatchEvent(
+                            new CustomEvent("trip:day-active", {
+                                detail: { locationId },
+                            }),
+                        );
+                    }
+                });
+            },
+            {
+                // Consideramos "activa" la tarjeta cuando cruza el tercio superior del viewport
+                rootMargin: "-20% 0px -60% 0px",
+                threshold: 0,
+            },
+        );
+
+        timeoutId = setTimeout(() => {
+            cards.forEach((card) => observer!.observe(card));
+        }, 50);
+
+        // Resalta la tarjeta del día actual, respetando el flag ?debugDate si está presente
+        const todayTrip = getTodayTrip();
+        const todayCard = todayTrip
+            ? document.getElementById(`day-${todayTrip.id}`)
+            : null;
+        todayCard?.classList.add("day-card--today");
+
+        // Botón flotante "Hoy": visible solo mientras la card del día actual
+        // no está en pantalla (y solo si hoy hay viaje, claro)
+        const jumpBtn = document.getElementById(
+            "jump-to-today",
+        ) as HTMLButtonElement | null;
+        if (jumpBtn && todayCard) {
+            todayObserver = new IntersectionObserver(
+                ([entry]) => {
+                    jumpBtn.classList.toggle(
+                        "is-visible",
+                        !entry.isIntersecting,
                     );
-                }
+                },
+                { threshold: 0 },
+            );
+            todayObserver.observe(todayCard);
+
+            jumpBtn.addEventListener("click", () => {
+                todayCard.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                });
             });
-        },
-        {
-            // Consideramos "activa" la tarjeta cuando cruza el tercio superior del viewport
-            rootMargin: "-20% 0px -60% 0px",
-            threshold: 0,
-        },
-    );
+        }
+    });
 
-    setTimeout(() => {
-        cards.forEach((card) => observer.observe(card));
-    }, 50);
-
-    // Resalta la tarjeta del día actual, respetando el flag ?debugDate si está presente
-    const todayTrip = getTodayTrip();
-    if (todayTrip) {
-        document
-            .getElementById(`day-${todayTrip.id}`)
-            ?.classList.add("day-card--today");
-    }
+    document.addEventListener("astro:before-swap", () => {
+        clearTimeout(timeoutId);
+        observer?.disconnect();
+        todayObserver?.disconnect();
+    });
 </script>

@@ -2,9 +2,11 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import TripMap from "../components/TripMap.astro";
 import TripTimeline from "../components/TripTimeline.astro";
+import TripHero from "../components/TripHero.astro";
 ---
 
-<BaseLayout title="Itinerario">
+<BaseLayout title="Itinerario" hideLogo hideStatus>
+	<TripHero />
 	<div class="trip-layout">
 		<div class="map-slot">
 			<TripMap />
@@ -17,6 +19,7 @@ import TripTimeline from "../components/TripTimeline.astro";
 	.trip-layout {
 		display: grid;
 		gap: 1.5rem;
+		margin-top: 1.5rem;
 	}
 	.map-slot {
 		position: sticky;
@@ -30,7 +33,6 @@ import TripTimeline from "../components/TripTimeline.astro";
 		overflow: hidden;
 		border: 3px solid var(--color-navy);
 		border-radius: 12px;
-		margin-top: 1rem;
 	}
 	.map-slot #trip-map {
 		height: 100% !important;
@@ -58,12 +60,12 @@ import TripTimeline from "../components/TripTimeline.astro";
 	}
 
 	@media (max-width: 768px) {
-		body.theme-vegas .map-slot .leaflet-tile-pane {
+		body[data-theme="vegas"] .map-slot .leaflet-tile-pane {
 			filter: saturate(1.9) hue-rotate(220deg) brightness(0.55)
 				contrast(1.25);
 			transition: filter 0.6s ease;
 		}
-		body.theme-vegas .map-slot {
+		body[data-theme="vegas"] .map-slot {
 			box-shadow:
 				0 0 18px var(--color-rust),
 				0 0 8px var(--color-turquoise) inset;

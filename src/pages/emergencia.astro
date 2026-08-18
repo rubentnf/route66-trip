@@ -1,0 +1,129 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { days } from "../data/trip";
+
+interface Stay {
+    name: string;
+    fromDay: number;
+    toDay: number;
+    nights: number;
+}
+
+const stays = days.reduce<Stay[]>((acc, day) => {
+    if (!day.overnight) return acc;
+    const last = acc[acc.length - 1];
+    if (last && last.name === day.overnight) {
+        last.toDay = day.id;
+        last.nights++;
+    } else {
+        acc.push({
+            name: day.overnight,
+            fromDay: day.id,
+            toDay: day.id,
+            nights: 1,
+        });
+    }
+    return acc;
+}, []);
+---
+
+<BaseLayout title="Emergencias">
+    <div class="emergency">
+        <h2>🆘 Info clave del viaje</h2>
+
+        <section class="emergency__section">
+            <h3>🏨 Alojamientos</h3>
+            <ul class="emergency__list">
+                {
+                    stays.map((stay) => (
+                        <li>
+                            <strong>{stay.name}</strong>
+                            <span>
+                                Día{stay.fromDay !== stay.toDay ? "s" : ""}{" "}
+                                {stay.fromDay}
+                                {stay.fromDay !== stay.toDay &&
+                                    `-${stay.toDay}`}{" "}
+                                · {stay.nights} noche
+                                {stay.nights !== 1 ? "s" : ""}
+                            </span>
+                        </li>
+                    ))
+                }
+            </ul>
+        </section>
+
+        <section class="emergency__section">
+            <h3>📞 Contactos y números importantes</h3>
+            <ul class="emergency__list">
+                <li>
+                    <strong>Emergencias en EE.UU.</strong>
+                    <span>911</span>
+                </li>
+                <li>
+                    <strong>Consulado de España más cercano</strong>
+                    <span class="fill-me">rellenar</span>
+                </li>
+                <li>
+                    <strong>Alquiler de coche</strong>
+                    <span class="fill-me">compañía · nº reserva · teléfono</span
+                    >
+                </li>
+                <li>
+                    <strong>Contacto de emergencia en España</strong>
+                    <span class="fill-me">nombre · teléfono</span>
+                </li>
+            </ul>
+        </section>
+    </div>
+</BaseLayout>
+
+<style>
+    .emergency {
+        padding: 1.5rem 0;
+        max-width: 640px;
+        margin: 0 auto;
+    }
+    .emergency__section {
+        background: white;
+        border: 2px solid var(--color-navy);
+        border-radius: 8px;
+        box-shadow: 4px 4px 0 var(--color-navy);
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+    .emergency__section h3 {
+        margin: 0 0 1rem;
+        font-size: 1.05rem;
+    }
+    .emergency__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .emergency__list li {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid #f1f1f0;
+    }
+    .emergency__list li:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+    .emergency__list strong {
+        font-size: 0.9rem;
+        color: var(--color-navy);
+    }
+    .emergency__list span {
+        font-size: 0.8rem;
+        color: #78716c;
+    }
+    .fill-me {
+        color: var(--color-rust) !important;
+        font-style: italic;
+    }
+</style>

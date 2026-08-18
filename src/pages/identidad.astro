@@ -294,13 +294,17 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 <script>
     import { DIVAS_PROFILES, setCurrentUser } from "../utils/identity";
 
-    const container = document.getElementById("identity-cards")!;
+    // astro:page-load se dispara en la carga inicial y en cada navegación
+    // por View Transitions; salimos si esta página no tiene selector.
+    document.addEventListener("astro:page-load", () => {
+        const container = document.getElementById("identity-cards");
+        if (!container) return;
 
-    container.innerHTML = DIVAS_PROFILES.map(
-        (profile) => `
-    <div class="identity-card" data-name="${profile.name}">
+        container.innerHTML = DIVAS_PROFILES.map(
+            (profile) => `
+    <div class="identity-card" data-name="${profile.name}" role="button" tabindex="0" aria-label="Elegir a ${profile.name}">
       <div class="identity-card__frame">
-        <img src="${profile.avatar}" alt="${profile.name}" />
+        <img src="${profile.avatar}" alt="${profile.name}" width="170" height="170" />
         <span class="identity-card__badge">⭐</span>
       </div>
       <div class="identity-card__label">
@@ -309,26 +313,41 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       </div>
     </div>
   `,
-    ).join("");
+        ).join("");
 
-    container.addEventListener("click", (e) => {
-        const card = (e.target as HTMLElement).closest(
-            ".identity-card",
-        ) as HTMLElement;
-        if (!card) return;
-        if (container.classList.contains("has-selection")) return;
+        function selectCard(card: HTMLElement) {
+            if (container!.classList.contains("has-selection")) return;
 
-        const name = card.dataset.name!;
+            const name = card.dataset.name!;
 
-        container.classList.add("has-selection");
-        card.classList.add("selecting");
+            container!.classList.add("has-selection");
+            card.classList.add("selecting");
 
-        setTimeout(() => {
-            setCurrentUser(name);
-            const redirectTo =
-                sessionStorage.getItem("identity-redirect") || "/";
-            sessionStorage.removeItem("identity-redirect");
-            window.location.href = redirectTo;
-        }, 650);
+            setTimeout(() => {
+                setCurrentUser(name);
+                const redirectTo =
+                    sessionStorage.getItem("identity-redirect") || "/";
+                sessionStorage.removeItem("identity-redirect");
+                window.location.href = redirectTo;
+            }, 650);
+        }
+
+        container.addEventListener("click", (e) => {
+            const card = (e.target as HTMLElement).closest(
+                ".identity-card",
+            ) as HTMLElement;
+            if (!card) return;
+            selectCard(card);
+        });
+
+        container.addEventListener("keydown", (e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            const card = (e.target as HTMLElement).closest(
+                ".identity-card",
+            ) as HTMLElement;
+            if (!card) return;
+            e.preventDefault();
+            selectCard(card);
+        });
     });
 </script>

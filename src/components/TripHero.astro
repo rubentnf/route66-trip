@@ -1,0 +1,216 @@
+---
+import { Image } from "astro:assets";
+import photo from "../assets/divasenruta.png";
+import logo from "../assets/logo.png";
+import { days, locations, totalStates, totalParks } from "../data/trip";
+
+const totalDays = days.length;
+const totalStops = locations.length;
+---
+
+<header class="hero">
+    <Image
+        src={photo}
+        alt="Ruben, Stephie y Saray en la Ruta 66"
+        class="hero__photo"
+        widths={[600, 1200, 1920]}
+        sizes="100vw"
+        loading="eager"
+        fetchpriority="high"
+    />
+    <div class="hero__scrim"></div>
+
+    <div class="hero__topbar">
+        <p class="hero__kicker">Ruta 66 · 17 oct - 1 nov 2026</p>
+        <Image
+            src={logo}
+            alt="Divas en Ruta"
+            class="hero__logo"
+            width={132}
+            height={72}
+            loading="eager"
+        />
+    </div>
+
+    <h1 class="hero__title">Divas <span>en</span> Ruta</h1>
+
+    <p class="hero__facts">
+        <span>{totalDays} días de viaje</span>
+        <span>{totalStops} paradas</span>
+        <span>{totalStates} estados</span>
+        <span>{totalParks} parques</span>
+    </p>
+
+    <div class="hero__live">
+        <span id="hero-countdown" class="hero__chip">🗓️ Cargando…</span>
+    </div>
+</header>
+
+<style>
+    .hero {
+        position: relative;
+        width: 100vw;
+        margin-left: calc(50% - 50vw);
+        margin-right: calc(50% - 50vw);
+        height: min(74vh, 620px);
+        min-height: 440px;
+        overflow: hidden;
+    }
+
+    .hero :global(.hero__photo) {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: 55% 26%;
+    }
+
+    .hero__scrim {
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(
+                200deg,
+                rgba(194, 65, 12, 0.5) 0%,
+                rgba(202, 138, 4, 0.32) 45%,
+                rgba(255, 183, 197, 0.16) 75%,
+                transparent 100%
+            ),
+            linear-gradient(
+                0deg,
+                rgba(20, 14, 10, 0.88) 0%,
+                rgba(20, 14, 10, 0) 46%
+            );
+        mix-blend-mode: multiply;
+    }
+
+    .hero__topbar {
+        position: absolute;
+        left: 6%;
+        right: 5%;
+        top: 5%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        z-index: 2;
+    }
+
+    .hero__kicker {
+        margin: 0;
+        font-family: var(--font-body);
+        font-size: 0.8rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #fdf8ee;
+    }
+
+    .hero :global(.hero__logo) {
+        flex-shrink: 0;
+        filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+    }
+
+    .hero__title {
+        position: absolute;
+        left: 6%;
+        right: 6%;
+        bottom: 30%;
+        margin: 0;
+        background: none;
+        padding: 0;
+        border-bottom: none;
+        font-family: "Anton", var(--font-display);
+        font-weight: 400;
+        text-transform: uppercase;
+        color: #fdf8ee;
+        font-size: clamp(2.6rem, 9vw, 6rem);
+        line-height: 0.92;
+        text-wrap: balance;
+    }
+
+    .hero__title span {
+        color: var(--color-rust);
+    }
+
+    .hero__facts {
+        position: absolute;
+        left: 6%;
+        right: 6%;
+        bottom: 17%;
+        margin: 0;
+        font-family: var(--font-body);
+        font-size: 0.78rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #fdf8ee;
+        opacity: 0.85;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .hero__facts span:not(:last-child)::after {
+        content: "\00b7";
+        margin: 0 0.5em;
+        opacity: 0.6;
+    }
+
+    .hero__live {
+        position: absolute;
+        left: 6%;
+        bottom: 6%;
+    }
+
+    .hero__chip {
+        display: inline-block;
+        background: var(--color-rust);
+        color: #fff;
+        font-family: var(--font-body);
+        font-weight: 700;
+        font-size: 0.78rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 0.45rem 0.85rem;
+        border-radius: 999px;
+    }
+
+    @media (max-width: 640px) {
+        .hero {
+            height: 48vh;
+            min-height: 340px;
+        }
+
+        .hero__title {
+            bottom: 32%;
+            font-size: clamp(2.1rem, 11vw, 3.2rem);
+        }
+
+        .hero__facts {
+            font-size: 0.62rem;
+        }
+    }
+</style>
+
+<script>
+    import { mountPhaseWidget } from "../utils/tripDate";
+
+    let stopWidget: (() => void) | undefined;
+
+    document.addEventListener("astro:page-load", () => {
+        const el = document.getElementById("hero-countdown");
+        if (!el) return;
+
+        stopWidget = mountPhaseWidget((phase) => {
+            if (phase.status === "before") {
+                el.textContent = `🗓️ Faltan ${phase.daysLeft} días`;
+            } else if (phase.status === "during") {
+                el.textContent = `📍 Hoy es el Día ${phase.today.id}: ${phase.today.title}`;
+            } else {
+                el.textContent = `✅ Viaje completado`;
+            }
+        });
+    });
+
+    document.addEventListener("astro:before-swap", () => stopWidget?.());
+</script>

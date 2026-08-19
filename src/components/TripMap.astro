@@ -20,18 +20,27 @@ const { roadRoute } = await getTripRoute();
 <style is:global>
     @import "leaflet/dist/leaflet.css";
 
-    .trip-marker {
-        display: flex;
+    .leaflet-marker-icon {
+        display: flex !important;
         align-items: center;
         justify-content: center;
-        width: 34px;
+    }
+
+    .trip-marker {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 34px;
         height: 34px;
-        border-radius: 50%;
+        padding: 0 6px;
+        border-radius: 999px;
         color: white;
+        font-family: var(--font-display);
         font-weight: 700;
-        font-size: 14px;
-        border: 3px solid white;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        font-size: 15px;
+        border: 3px solid var(--color-navy);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+        white-space: nowrap;
     }
 
     .map-wrap {
@@ -72,13 +81,75 @@ const { roadRoute } = await getTripRoute();
             0 4px 10px rgba(0, 0, 0, 0.4);
         z-index: 1000 !important;
     }
+
+    .leaflet-popup-content-wrapper {
+        background: var(--color-sand);
+        border: 3px solid var(--color-navy);
+        border-radius: 10px;
+        box-shadow: 4px 4px 0 var(--color-navy);
+        padding: 0;
+    }
+
+    .leaflet-popup-content {
+        margin: 0.85rem 1rem;
+    }
+
+    .leaflet-popup-tip {
+        background: var(--color-navy);
+    }
+
+    .leaflet-popup-close-button {
+        color: var(--color-navy) !important;
+        font-size: 18px !important;
+        top: 6px !important;
+        right: 8px !important;
+    }
+
+    .map-popup__eyebrow {
+        margin: 0;
+        font-family: var(--font-body);
+        font-size: 0.68rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--popup-accent, var(--color-rust));
+        font-weight: 700;
+    }
+    .map-popup__title {
+        margin: 0.15rem 0 0.4rem;
+        font-family: var(--font-display);
+        font-size: 1rem;
+        text-transform: uppercase;
+        color: var(--color-navy);
+    }
+    .map-popup__fact {
+        margin: 0 0 0.5rem;
+        font-size: 0.75rem;
+        font-style: italic;
+        color: var(--color-navy);
+        opacity: 0.85;
+    }
+    .map-popup__days {
+        margin: 0;
+        padding-left: 1rem;
+        font-size: 0.8rem;
+    }
+    .map-popup__days li:not(:last-child) {
+        margin-bottom: 0.25rem;
+    }
+    .map-popup__days a {
+        color: var(--color-turquoise);
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .map-popup__days a:hover {
+        text-decoration: underline;
+    }
 </style>
 
 <script>
     import L from "leaflet";
     import { locations, days, type TripDay } from "../data/trip";
     import { getTodayTrip } from "../utils/tripDate";
-    import { check } from "astro:schema";
 
     const colorMap: Record<string, string> = {
         purple: "#7c3aed",
@@ -158,15 +229,29 @@ const { roadRoute } = await getTripRoute();
             const icon = L.divIcon({
                 className: "",
                 html: `<div class="trip-marker" style="background:${color}">${label}</div>`,
-                iconSize: [34, 34],
-                iconAnchor: [17, 17],
+                iconSize: [50, 34],
+                iconAnchor: [25, 17],
             });
 
+            const fromDate = new Date(groupDays[0].date).toLocaleDateString(
+                "es-ES",
+                { day: "2-digit", month: "short" },
+            );
+            const toDate = new Date(
+                groupDays[groupDays.length - 1].date,
+            ).toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
+            const dateRange =
+                groupDays.length === 1 ? fromDate : `${fromDate} – ${toDate}`;
+
             const popupHtml = `
-        <strong>${location.name}</strong>
-        <ul style="margin:6px 0 0; padding-left:16px;">
-          ${groupDays.map((d) => `<li><a href="#day-${d.id}">Día ${d.id} · ${d.title}</a></li>`).join("")}
-        </ul>
+        <div style="--popup-accent:${color}">
+          <p class="map-popup__eyebrow">${dateRange}</p>
+          <h3 class="map-popup__title">${location.name}</h3>
+          ${location.funFact ? `<p class="map-popup__fact">${location.funFact}</p>` : ""}
+          <ul class="map-popup__days">
+            ${groupDays.map((d) => `<li><a href="#day-${d.id}">Día ${d.id} · ${d.title}</a></li>`).join("")}
+          </ul>
+        </div>
         `;
 
             markersByLocation[locationId] = L.marker(
@@ -174,7 +259,7 @@ const { roadRoute } = await getTripRoute();
                 { icon },
             )
                 .addTo(mapInstance)
-                .bindPopup(popupHtml);
+                .bindPopup(popupHtml, { minWidth: 220, maxWidth: 260 });
         });
 
         let roadRoute: [number, number][] = [];

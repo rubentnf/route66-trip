@@ -4,6 +4,7 @@ import { ClientRouter } from "astro:transitions";
 import TripStatus from "../components/TripStatus.astro";
 import NavBar from "../components/NavBar.astro";
 import logo from "../assets/logo.png";
+import { describe } from "astro:schema";
 
 interface Props {
     title: string;
@@ -17,16 +18,36 @@ const {
     hideLogo = false,
     hideStatus = false,
 } = Astro.props;
+
+const pageTitle = `${title} · Divas en Ruta`;
+const description =
+    "Nuestro viaje por la Ruta 66: itinerario, mapa, paylist y más - Rubén, Stephie y Saray, 17 oct - 1 nov 2026.";
+const ogImage = new URL("/og-image.png", Astro.site ?? Astro.url).href;
 ---
 
 <html lang="es">
     <head>
         <meta charset="utf-8" />
+        <meta name="description" content={description} />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
+
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={description} />
+        <meta property="og:image" content={ogImage} />
+        <meta property="og:url" content={Astro.url.href} />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={pageTitle} />
+        <meta name="twitter:description" content={description} />
+        <meta name="twitter:image" content={ogImage} />
+
         <title>{title} · Divas en Ruta</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="theme-color" content="#c2410c" />
         <link
             href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Anton&family=Work+Sans:wght@400;500;600&display=swap"
             rel="stylesheet"
@@ -34,6 +55,19 @@ const {
         <ClientRouter />
 
         <script is:inline>
+            if ("serviceWorker" in navigator) {
+                window.addEventListener("load", () => {
+                    navigator.serviceWorker
+                        .register("/sw.js")
+                        .catch((err) =>
+                            console.warn(
+                                "No se pudo registrar el service worker",
+                                err,
+                            ),
+                        );
+                });
+            }
+
             (function () {
                 const isIdentityPage =
                     window.location.pathname.replace(/\/$/, "") ===

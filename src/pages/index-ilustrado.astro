@@ -1,0 +1,350 @@
+---
+import { ClientRouter } from "astro:transitions";
+import { getDaysWithDetails } from "../utils/dayDetails";
+import { locations, totalStates, totalParks } from "../data/trip";
+import { describeWeatherCode } from "../utils/weather";
+import TripMap from "../components/TripMap.astro";
+
+const daysWithDetails = await getDaysWithDetails();
+const totalDays = daysWithDetails.length;
+const totalStops = locations.length;
+const totalKm = daysWithDetails.reduce((sum, d) => sum + (d.distanceKm ?? 0), 0);
+
+let running = 0;
+const cumulativeKmByDayId: Record<number, number> = {};
+for (const { day, distanceKm } of daysWithDetails) {
+    running += distanceKm ?? 0;
+    cumulativeKmByDayId[day.id] = running;
+}
+
+// orden de aparición de las paradas, como en TripMap
+const seenLoc = new Set<string>();
+const orderedLocations = [];
+for (const { day } of daysWithDetails) {
+    if (seenLoc.has(day.locationId)) continue;
+    seenLoc.add(day.locationId);
+    const loc = locations.find((l) => l.id === day.locationId);
+    if (loc) orderedLocations.push(loc);
+}
+
+const bubbleColor: Record<string, string> = {
+    purple: "#7c3aed", green: "#16a34a", orange: "#c2410c", blue: "#2563eb",
+    red: "#dc2626", yellow: "#ca8a04", brown: "#78350f", teal: "#0d9488",
+};
+const bubbleSlots = [
+    { left: "3%", top: "6%", size: 84 },
+    { left: "20%", top: "58%", size: 64 },
+    { left: "35%", top: "10%", size: 96 },
+    { left: "48%", top: "56%", size: 70 },
+    { left: "62%", top: "8%", size: 66 },
+    { left: "74%", top: "54%", size: 80 },
+    { left: "87%", top: "4%", size: 60 },
+    { left: "10%", top: "80%", size: 58 },
+    { left: "58%", top: "82%", size: 62 },
+];
+---
+
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Divas en Ruta · Ilustrado</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+    />
+    <ClientRouter />
+</head>
+<body>
+    <div id="days-data" data-days={JSON.stringify(daysWithDetails)} data-cumkm={JSON.stringify(cumulativeKmByDayId)} hidden></div>
+
+    <div class="s1-hero">
+        <div class="s1-hero__nav">
+            <span class="s1-logo">Divas en Ruta</span>
+            <span class="s1-hero__nav-links">
+                <a href="/">Itinerario</a>
+                <a href="/playlist">Playlist</a>
+                <a href="/emergencia">Emergencias</a>
+                <a href="/itinerario.ics">Calendario</a>
+            </span>
+        </div>
+        <div class="s1-sun"></div>
+        <div class="s1-arch"></div>
+        <h1 class="s1-hero__title">Salimos a rodar por la Ruta 66</h1>
+        <div class="s1-search">
+            <div class="s1-search__row">
+                <div class="s1-search__field"><small>Días</small><strong>{totalDays}</strong></div>
+                <div class="s1-search__field"><small>Paradas</small><strong>{totalStops}</strong></div>
+                <div class="s1-search__field"><small>Estados</small><strong>{totalStates}</strong></div>
+                <div class="s1-search__field"><small>Parques</small><strong>{totalParks}</strong></div>
+                <div class="s1-search__field"><small>Km totales</small><strong>{totalKm.toLocaleString("es-ES")}</strong></div>
+            </div>
+        </div>
+        <div class="s1-mascot"><div class="s1-mascot__body"></div></div>
+    </div>
+
+    <svg class="wave-divider" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0,40 C240,100 480,0 720,45 C960,90 1200,10 1440,55 L1440,120 L0,120 Z" fill="#131a33"></path>
+    </svg>
+
+    <div class="s1-dark">
+        <div class="s1-dark__grid">
+            <div>
+                <p class="tag">Sobre la marcha</p>
+                <h2 id="s1-status-title">Cargando estado del viaje…</h2>
+                <p id="s1-status-desc">Un momento.</p>
+            </div>
+            <div class="s1-plancard" id="s1-plancard" hidden>
+                <small>Hoy en el viaje</small>
+                <h3 id="s1-plan-title"></h3>
+                <div class="row" id="s1-plan-weather"></div>
+                <div class="row" id="s1-plan-km"></div>
+                <div class="row" id="s1-plan-overnight"></div>
+            </div>
+        </div>
+    </div>
+
+    <svg class="wave-divider" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0,70 C240,20 480,110 720,60 C960,15 1200,95 1440,50 L1440,120 L0,120 Z" fill="#f0e2c8"></path>
+    </svg>
+
+    <div class="s1-sand">
+        <p class="tag">Vuestras paradas</p>
+        <h2>Nueve sitios, un solo viaje</h2>
+        <div class="bubbles">
+            {orderedLocations.map((loc, i) => {
+                const slot = bubbleSlots[i % bubbleSlots.length];
+                const color = bubbleColor[loc.colorGroup] ?? "#333";
+                return (
+                    <a
+                        class="bubble"
+                        href={`#day-${loc.id}`}
+                        style={`left:${slot.left}; top:${slot.top}; width:${slot.size}px; height:${slot.size}px; background:${color};`}
+                    >
+                        {loc.name}
+                    </a>
+                );
+            })}
+        </div>
+    </div>
+
+    <main class="itinerary">
+        <p class="section-tag">Itinerario completo</p>
+        {daysWithDetails.map(({ day, weather, warning, sun, distanceKm, funFact }) => (
+            <article class="day" id={`day-${day.locationId}`} data-day-id={day.id}>
+                <div class="day__top">
+                    <span class="day__badge">{day.id}</span>
+                    <div>
+                        <p class="day__date">
+                            {new Date(day.date).toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "long" })}
+                        </p>
+                        <h3>{day.title}</h3>
+                    </div>
+                </div>
+
+                <div class="day__chips">
+                    {weather && (
+                        <span class="chip chip--sun">
+                            {describeWeatherCode(weather.weatherCode).icon} {Math.round(weather.tempMax)}° / {Math.round(weather.tempMin)}°
+                            <em>{weather.source === "forecast" ? "previsión" : "aprox."}</em>
+                        </span>
+                    )}
+                    {sun && <span class="chip chip--blue">🌅 {sun.sunrise} · 🌇 {sun.sunset}</span>}
+                    {distanceKm !== undefined && <span class="chip chip--blue">🚗 {distanceKm} km hasta aquí</span>}
+                    {day.transportIcon === "flight" && <span class="chip chip--blue">✈️ Vuelo</span>}
+                </div>
+
+                {warning && <p class="day__warning">{warning.icon} {warning.message}</p>}
+                {funFact && <p class="day__fact">"{funFact}"</p>}
+
+                <ul class="day__acts">
+                    {day.activities.map((act) => <li>{act}</li>)}
+                </ul>
+
+                {day.overnight && <p class="day__overnight">🌙 {day.overnight}</p>}
+            </article>
+        ))}
+    </main>
+
+    <section class="map-wrap-outer">
+        <p class="section-tag">Ruta en el mapa</p>
+        <div class="map-frame"><TripMap /></div>
+    </section>
+
+    <footer class="colophon">Divas en Ruta · versión ilustrada, con los 16 días reales</footer>
+
+    <script>
+        import { mountPhaseWidget } from "../utils/tripDate";
+
+        interface DayDetail {
+            day: { id: number; title: string; overnight: string | null };
+            weather: { tempMax: number; tempMin: number } | null;
+            distanceKm: number | undefined;
+        }
+
+        const dataEl = document.getElementById("days-data") as HTMLElement;
+        const daysWithDetails: DayDetail[] = JSON.parse(dataEl.dataset.days ?? "[]");
+        const cumulativeKmByDayId: Record<string, number> = JSON.parse(dataEl.dataset.cumkm ?? "{}");
+
+        const titleEl = document.getElementById("s1-status-title")!;
+        const descEl = document.getElementById("s1-status-desc")!;
+        const planCard = document.getElementById("s1-plancard")!;
+        const planTitle = document.getElementById("s1-plan-title")!;
+        const planWeather = document.getElementById("s1-plan-weather")!;
+        const planKm = document.getElementById("s1-plan-km")!;
+        const planOvernight = document.getElementById("s1-plan-overnight")!;
+
+        mountPhaseWidget((phase) => {
+            if (phase.status === "before") {
+                titleEl.textContent = `Faltan ${phase.daysLeft} días`;
+                descEl.textContent = "El clima y las curiosidades de cada parada ya están listos para cuando arranquéis.";
+                planCard.hidden = true;
+            } else if (phase.status === "during") {
+                const detail = daysWithDetails.find((d) => d.day.id === phase.today.id);
+                titleEl.textContent = `Día ${phase.today.id} de 16`;
+                descEl.textContent = `Hoy toca: ${phase.today.title}.`;
+                if (detail) {
+                    planCard.hidden = false;
+                    planTitle.textContent = phase.today.title;
+                    planWeather.textContent = detail.weather
+                        ? `☀️ ${Math.round(detail.weather.tempMax)}° / ${Math.round(detail.weather.tempMin)}°`
+                        : "";
+                    const km = cumulativeKmByDayId[phase.today.id];
+                    planKm.textContent = km ? `🚗 ${km} km recorridos hasta hoy` : "";
+                    planOvernight.textContent = detail.day.overnight ? `🌙 ${detail.day.overnight}` : "";
+                }
+            } else {
+                titleEl.textContent = "Viaje completado";
+                descEl.textContent = `${daysWithDetails.length} días, ¡qué pasada!`;
+                planCard.hidden = true;
+            }
+        });
+    </script>
+
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Inter", -apple-system, "Segoe UI", sans-serif;
+            color: #1c2340;
+            background: #fff;
+        }
+        a { color: inherit; }
+
+        .s1-hero {
+            position: relative;
+            padding: 1.6rem 5% 6rem;
+            background: linear-gradient(180deg, #dcd5ee 0%, #f3c9c9 42%, #f5a888 72%, #dd7454 100%);
+            overflow: hidden;
+        }
+        .s1-hero__nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.6rem; position: relative; z-index: 3; flex-wrap: wrap; gap: 0.8rem; }
+        .s1-logo { font-family: "Fraunces", serif; font-weight: 700; font-style: italic; font-size: 1.4rem; color: #1c2340; }
+        .s1-hero__nav-links { display: flex; gap: 1.2rem; font-size: 0.82rem; font-weight: 600; }
+        .s1-hero__nav-links a { text-decoration: none; color: rgba(28,35,64,0.75); }
+
+        .s1-arch {
+            position: absolute; left: 0; right: 0; bottom: 0; height: 38%;
+            background: #2a2140;
+            clip-path: polygon(0% 100%, 0% 55%, 8% 55%, 8% 20%, 14% 20%, 14% 55%, 30% 55%, 30% 35%, 36% 35%, 36% 55%, 60% 55%, 60% 15%, 66% 15%, 66% 55%, 82% 55%, 82% 40%, 88% 40%, 88% 55%, 100% 55%, 100% 100%);
+            opacity: 0.85;
+        }
+        .s1-sun { position: absolute; left: 50%; top: 26%; width: 150px; height: 150px; border-radius: 50%; background: #fdf0da; opacity: 0.9; transform: translateX(-50%); box-shadow: 0 0 90px 24px rgba(253,240,218,0.4); }
+
+        .s1-hero__title {
+            position: relative; z-index: 3;
+            font-family: "Fraunces", serif;
+            font-weight: 700;
+            font-size: clamp(2.2rem, 6vw, 3.6rem);
+            color: #1c2340;
+            max-width: 620px;
+            margin: 0 0 2.2rem;
+            line-height: 1.05;
+        }
+
+        .s1-search { position: relative; z-index: 4; background: #fff; border-radius: 22px; padding: 1.2rem 1.4rem; box-shadow: 0 24px 50px -16px rgba(28,35,64,0.4); max-width: 720px; }
+        .s1-search__row { display: flex; gap: 1.6rem; flex-wrap: wrap; }
+        .s1-search__field small { display: block; font-size: 0.68rem; color: #9a94ab; text-transform: uppercase; letter-spacing: 0.03em; }
+        .s1-search__field strong { display: block; font-size: 1.1rem; color: #1c2340; font-family: "Fraunces", serif; }
+
+        .s1-mascot { position: absolute; z-index: 3; right: 8%; top: 12%; width: 56px; height: 62px; }
+        .s1-mascot__body { width: 44px; height: 50px; background: #5b8def; border-radius: 14px; margin: 0 auto; position: relative; }
+        .s1-mascot__body::before { content: ""; position: absolute; top: 12px; left: 8px; width: 28px; height: 8px; background: #1c2340; border-radius: 4px; }
+        .s1-mascot__body::after { content: "😎"; position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 1.2rem; }
+
+        .wave-divider {
+            display: block;
+            width: 100%;
+            height: 70px;
+            margin: -1px 0;
+        }
+
+        .s1-dark {
+            background: #131a33; padding: 3.2rem 5%; position: relative;
+        }
+        .s1-dark__grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 2.5rem; align-items: center; max-width: 1100px; margin: 0 auto; }
+        @media (max-width: 700px) { .s1-dark__grid { grid-template-columns: 1fr; } }
+        .s1-dark .tag { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #ffb787; margin: 0 0 0.6rem; }
+        .s1-dark h2 { font-family: "Fraunces", serif; font-size: 1.9rem; color: #fff; margin: 0 0 0.9rem; }
+        .s1-dark p { font-size: 0.9rem; color: rgba(255,255,255,0.68); margin: 0; }
+
+        .s1-plancard { background: #fff; border-radius: 20px; padding: 1.2rem; box-shadow: 0 20px 40px -14px rgba(0,0,0,0.4); }
+        .s1-plancard small { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em; color: #6c5ce7; text-transform: uppercase; }
+        .s1-plancard h3 { margin: 0.4rem 0 0.7rem; font-family: "Fraunces", serif; font-size: 1.15rem; color: #1c2340; }
+        .s1-plancard .row { font-size: 0.82rem; color: #6b6480; margin-bottom: 0.35rem; }
+
+        .s1-sand { background: #f0e2c8; padding: 4rem 5%; }
+        .s1-sand .tag { text-align: center; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #b5590f; margin: 0 0 0.5rem; }
+        .s1-sand h2 { font-family: "Fraunces", serif; text-align: center; font-size: 1.9rem; margin: 0 0 2.5rem; color: #3a2b12; }
+        .bubbles { position: relative; height: 320px; max-width: 900px; margin: 0 auto; }
+        .bubble {
+            position: absolute; border-radius: 50%; text-decoration: none;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 14px 28px -10px rgba(0,0,0,0.35);
+            font-size: 0.72rem; font-weight: 800; color: #fff; text-align: center; padding: 0.5rem;
+            transition: transform 0.15s ease;
+        }
+        .bubble:hover { transform: scale(1.06); }
+
+        main.itinerary { max-width: 760px; margin: 0 auto; padding: 4rem 1.25rem; }
+        .section-tag { text-align: center; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #9a94ab; margin: 0 0 2rem; }
+
+        .day {
+            background: #fff;
+            border-radius: 24px;
+            padding: 1.6rem;
+            margin-bottom: 1.4rem;
+            box-shadow: 0 16px 34px -18px rgba(28,35,64,0.3);
+            border: 1px solid rgba(28,35,64,0.06);
+        }
+        .day__top { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+        .day__badge {
+            width: 44px; height: 44px; border-radius: 16px; background: #6c5ce7; color: #fff;
+            display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.05rem; flex-shrink: 0;
+        }
+        .day__date { margin: 0; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: #9a94ab; font-weight: 700; }
+        .day h3 { margin: 0.15rem 0 0; font-family: "Fraunces", serif; font-size: 1.25rem; color: #1c2340; }
+
+        .day__chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.9rem; }
+        .chip { font-size: 0.74rem; font-weight: 700; padding: 0.4rem 0.75rem; border-radius: 999px; display: inline-flex; align-items: center; gap: 0.3rem; }
+        .chip--sun { background: #fff2e2; color: #b5590f; }
+        .chip--blue { background: #eaf1fc; color: #2f5fa8; }
+        .chip em { font-style: normal; opacity: 0.6; font-weight: 500; margin-left: 0.15rem; }
+
+        .day__warning { background: #fff2e2; border-left: 3px solid #d97706; padding: 0.6rem 0.85rem; border-radius: 0 10px 10px 0; font-size: 0.84rem; font-weight: 600; color: #92400e; margin: 0 0 0.9rem; }
+        .day__fact { font-family: "Fraunces", serif; font-style: italic; color: #6b6480; font-size: 0.92rem; margin: 0 0 0.9rem; }
+
+        .day__acts { margin: 0 0 0.9rem; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.35rem; }
+        .day__acts li { font-size: 0.88rem; color: #33304a; }
+
+        .day__overnight { margin: 0; padding-top: 0.8rem; border-top: 1px solid rgba(28,35,64,0.08); font-size: 0.82rem; color: #6b6480; }
+
+        .map-wrap-outer { max-width: 900px; margin: 0 auto 4rem; padding: 0 1.25rem; }
+        .map-frame { height: 420px; border-radius: 24px; overflow: hidden; box-shadow: 0 16px 34px -18px rgba(28,35,64,0.3); }
+
+        footer.colophon { text-align: center; padding: 2rem; font-size: 0.78rem; color: #9a94ab; }
+    </style>
+</body>
+</html>
